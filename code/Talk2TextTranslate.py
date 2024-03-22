@@ -2,7 +2,7 @@ import os
 import time
 import datetime
 
-import fpdf
+from fpdf import FPDF
 import pyaudio
 import wave
 import tkinter as tk
@@ -11,10 +11,13 @@ import threading
 import speech_recognition as sr
 from deep_translator import GoogleTranslator
 from gtts import gTTS
+from tkinter import messagebox
 
 class Talk2TextTranslate:
     def __init__(self):
         self.root = tk.Tk()
+        self.current = os.getcwd()
+        self.main_dir = os.path.dirname(self.current)
         self.height = self.root.winfo_screenheight()
         self.width = self.root.winfo_screenwidth()
         self.root.resizable = (self.height,self.width)
@@ -48,6 +51,15 @@ class Talk2TextTranslate:
 
         self.root.mainloop()
 
+    def show_popup(self,HEADING,message):
+        popup = tk.Toplevel()
+        popup.title(HEADING)
+
+        label = tk.Label(popup, text=message, padx=20, pady=10)
+        label.pack()
+
+        ok_button = tk.Button(popup, text="OK", command=popup.destroy)
+        ok_button.pack(pady=10)
     def click_handler(self):
         if self.recording:
             self.recording=False
@@ -64,7 +76,6 @@ class Talk2TextTranslate:
         while self.recording:
             data = stream.read(1024)
             frames.append(data)
-
             passed = time.time()-start
             seconds = passed % 60
             minutes = passed // 60
@@ -75,8 +86,9 @@ class Talk2TextTranslate:
         audio.terminate()
         # save the recorded input
         current_time = datetime.datetime.now()
+        audio_recording_file_path = str(self.main_dir+"/"+"recorded_audio/")
         self.recording_file_name = f"recorded_input_{current_time.year}_{current_time.month}_{current_time.day}_{current_time.second}.wav"
-        sound_file = wave.open(self.recording_file_name,"wb")
+        sound_file = wave.open(str(audio_recording_file_path + self.recording_file_name),"wb")
         sound_file.setnchannels(1)
         sound_file.setsampwidth(audio.get_sample_size(pyaudio.paInt16))
         sound_file.setframerate(44100)
@@ -112,8 +124,8 @@ class Talk2TextTranslate:
             output_lang = 'hi'
         print(input_lang,output_lang)
         return input_lang,output_lang
-    def translate_text(self):
-        input_lang,output_lang = self.language_selected()
+    def transcribe_text(self):
+        input_lang, output_lang = self.language_selected()
         recognizer = sr.Recognizer()
         if self.latest:
             audio_file = self.recording_file_name
@@ -121,14 +133,49 @@ class Talk2TextTranslate:
             audio_file = self.recording_file_name_load
         with sr.AudioFile(audio_file) as source:
             audio_data = recognizer.record(source)
-            query = recognizer.recognize_google(audio_data,language=input_lang)
-        print(query)
-        translated_query = GoogleTranslator(source='auto', target=output_lang).translate(query)
+            query = recognizer.recognize_google(audio_data, language=input_lang)
+        self.save_to_text_file(query, str(" Transcribed text"), str(self.main_dir+"/transcribed/"),"transcription")
+        self.show_popup("Transcribed", query)
+        return query
+    def translate_text(self):
+        input_lang,output_lang = self.language_selected()
+        transcribed_query = self.transcribe_text()
+        print(transcribed_query)
+        translated_query = GoogleTranslator(source='auto', target=output_lang).translate(transcribed_query)
         print(translated_query)
+        self.show_popup("Translated",translated_query)
+        self.save_to_text_file(translated_query,str(input_lang + " translated to " + output_lang ),str(self.main_dir+"/translated/"),"translation")
 
     def browse_file(self):
         file_path = filedialog.askopenfilename(filetypes=[("WAV files", "*.wav")])
         self.recording_file_name_load = file_path
+    def save_to_PDF(self, text, heading, file_name):
+        # Config pdf
+        text = text.encode('utf-8')
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font("Arial", size=16, style='B')
+
+        # Add heading
+        pdf.cell(200, 10, txt=heading, ln=True, align="C")
+        pdf.ln(10)
+
+        # Set font for the text
+        pdf.set_font("Arial", size=12)
+
+        # Add text
+        pdf.multi_cell(200, 10, txt=text)
+
+        # Save the PDF to a file
+        pdf.output(file_name)
+
+    def save_to_text_file(self, text, heading, path_to_save,caller):
+        file_name = str(f"{caller}_{time.time()}.txt")
+        file_path = os.path.join(path_to_save, file_name)
+        with open(file_path, 'w', encoding='utf-8') as text_file:
+            text_file.write(heading + '\n\n')
+            text_file.write(text)
+
 
 
 Talk2TextTranslate()

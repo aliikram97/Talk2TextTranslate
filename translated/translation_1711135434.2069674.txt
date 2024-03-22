@@ -1,0 +1,3 @@
+ Transcribed text
+
+this is a testing for checking if my system can autonomously detect what kind of language I am speaking and then converted to similar language so this test will run for about 17 seconds now 18 or 19 and then I am going to check if it actually checks for randomised words like tokenizing
